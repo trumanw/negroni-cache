@@ -1,15 +1,18 @@
 language: go
+go_import_path: github.com/trumanw/negroni-cache
+sudo: fale
 go:
-  - 1.7.1
+    - 1.7.1
 
 env:
-  global:
-    - GO15VENDOREXPERIMENT=1
+    global:
+        - GO15VENDOREXPERIMENT=1
 
 install:
-  - go get -v github.com/stretchr/testify/assert
-  - go get -v github.com/rainycape/vfs
-  - go get -v gopkg.in/djherbis/stream.v1
+    - go get -v github.com/urfave/negroni
+    - go get -v github.com/stretchr/testify/assert
+    - go get -v github.com/rainycape/vfs
+    - go get -v gopkg.in/djherbis/stream.v1
 
 script:
-  go test -v ./...
+    go test -v ./...
