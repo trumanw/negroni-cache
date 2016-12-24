@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# Generate coverage HTML
+#
+set -e
+
+COVERMODE="count"
+COVERFILE="coverage"
+
+# Test and generate the coverage report
+go test -v -covermode=${COVERMODE} -coverprofile=${COVERFILE}.out
+
+# Show the coverage report
+go tool cover -html=${COVERFILE}.out
