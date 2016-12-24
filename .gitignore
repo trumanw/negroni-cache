@@ -22,3 +22,9 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Coverage report
+coverage.out
+
+# Testing created directory
+cache/
