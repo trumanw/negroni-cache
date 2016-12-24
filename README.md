@@ -1,4 +1,7 @@
 # negroni-cache
+
+[![Build Status](https://travis-ci.org/trumanw/negroni-cache.svg?branch=develop)](https://travis-ci.org/trumanw/negroni-cache)
+
 A standard compatible([RFC 7234](http://www.rfc-base.org/rfc-7234.html)) HTTP Cache middleware for negroni.
 
 # Usage
