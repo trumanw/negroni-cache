@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#
+# Generate coverage HTML
+#
+set -e
+
+# Clean the testing generated files and folders
+rm -rf cache
+rm -f coverage.out
