@@ -1,0 +1,15 @@
+language: go
+go:
+  - 1.7.1
+
+env:
+  global:
+    - GO15VENDOREXPERIMENT=1
+
+install:
+  - go get -v github.com/stretchr/testify/assert
+  - go get -v github.com/rainycape/vfs
+  - go get -v gopkg.in/djherbis/stream.v1
+
+script:
+  go test -v ./...
