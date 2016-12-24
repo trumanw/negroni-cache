@@ -2,17 +2,22 @@ language: go
 go_import_path: github.com/trumanw/negroni-cache
 sudo: fale
 go:
-    - 1.7.1
-
+- 1.7.1
+- tip
 env:
-    global:
-        - GO15VENDOREXPERIMENT=1
+  global:
+  - GO15VENDOREXPERIMENT=1
+  - secure: Mp4MK3MaytZgqVCnUK7c7cnnadoRczvMEAT7KgEqBwpcxF/A+OOTdKf0VSmd4A5f3IQ58wbeMLeGF7QEVT/HJ1ckQDK047NSXo/FoTspqrxow0AJPWnLi6os2JMKdW/RjvH5nI9VnjyG4IPY6uNn8yvvdkfssUmLKyM2a62SasyTelo0KzSXmP/TkO6SAexk1HUB7Um3VB9E/lHtzpdPB6dUntHUt0hNo72Ci8XwIUTzKx3vPTbJIx57579L0O+WJOzc5sKgJDgXcb8IqlP0XYNP+qw6NEoNUulCs9XPo2tkrvSmzWS/1uEsBqReIfGPTN3MNWGlq4mTSlQ0eGT1AIy+1n9eicJIp/UNg/Q79sKmuF8CZWkBPG/gV0L0hPHjHXkjhf2vUn2lNAmmnuCp7+YcmEUnCZ5rXVLD4tOELKMvdpnD7vWbdTwvu7M9Xm15B5Je6B4cdQC7MPnOqlIhAjxbElJStpk5dmsImywFu0o/5+aaZ5YHsKQcfeGUSn63zCf01Ryo5a3yfxYLeAiySWie2qfwRJY6kwdkEMYGik7SFkcOhb1/1kvdp0CXhvo4L2BV7g9If6O/0d5Wo477Kk3xPP8alZ5x/c6e4mHazYQWNJLO5Ss1KrCeDAughEU66regKxyjBMZCS3NWyxlg2lg5F60I4H2tdAYppr+wbrw=
 
 install:
-    - go get -v github.com/urfave/negroni
-    - go get -v github.com/stretchr/testify/assert
-    - go get -v github.com/rainycape/vfs
-    - go get -v gopkg.in/djherbis/stream.v1
+- go get -v github.com/urfave/negroni
+- go get -v github.com/stretchr/testify/assert
+- go get -v github.com/rainycape/vfs
+- go get -v gopkg.in/djherbis/stream.v1
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
 
-script:
-    go test -v ./...
+script: go test -v -covermode=count -coverprofile=coverage.out
+
+after_script: $(go env GOPATH | awk 'BEGIN{FS=":"} {print $1}')/bin/goveralls -coverprofile=coverage.out
+  -service=travis-ci -repotoken $COVERALLS_TOKEN
