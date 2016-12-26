@@ -6,6 +6,7 @@ import (
     "net/http"
 )
 
+// CacheRequest extended http.Request to include more cache associated parameters.
 type CacheRequest struct {
     *http.Request
 	Key          Key
@@ -13,6 +14,7 @@ type CacheRequest struct {
 	CacheControl CacheControl
 }
 
+// NewCacheRequest constructs an instance of CacheRequest
 func NewCacheRequest(r *http.Request) (*CacheRequest, error) {
 	cc, err := ParseCacheControl(r.Header.Get("Cache-Control"))
 	if err != nil {
@@ -31,6 +33,7 @@ func NewCacheRequest(r *http.Request) (*CacheRequest, error) {
 	}, nil
 }
 
+// isCacheable returns true when request can be cacheable
 func (r *CacheRequest) isCacheable() bool {
 	if !(r.Method == "GET" || r.Method == "HEAD") {
 		return false

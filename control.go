@@ -48,7 +48,6 @@ func ParseCacheControl(input string) (CacheControl, error) {
 			lastKey = token
 		}
 	}
-
 	return cc, nil
 }
 
