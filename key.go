@@ -27,7 +27,6 @@ func NewRequestKey(r *http.Request) Key {
 
 	if location := r.Header.Get("Content-Location"); location != "" {
 		u, err := url.Parse(location)
-		fmt.Printf("Parsed URL is %v\n", u)
 		if err == nil {
 			if !u.IsAbs() {
 				u = r.URL.ResolveReference(u)
@@ -60,7 +59,6 @@ func (k Key) Vary(varyHeader string, r *http.Request) Key {
 	for _, header := range strings.Split(varyHeader, ", ") {
 		k2.vary = append(k2.vary, header+"="+r.Header.Get(header))
 	}
-	fmt.Printf("Varied key: %v", k2)
 	return k2
 }
 

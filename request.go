@@ -33,6 +33,15 @@ func NewCacheRequest(r *http.Request) (*CacheRequest, error) {
 	}, nil
 }
 
+// isStateChanging returns true if HTTP methods are POST, PUT and DELETE
+func (r *CacheRequest) isStateChanging() bool {
+    if !(r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE") {
+		return true
+	}
+
+	return false
+}
+
 // isCacheable returns true when request can be cacheable
 func (r *CacheRequest) isCacheable() bool {
 	if !(r.Method == "GET" || r.Method == "HEAD") {

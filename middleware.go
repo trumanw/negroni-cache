@@ -1,7 +1,6 @@
 package negronicache
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -47,7 +46,7 @@ var cacheableByDefault = map[int]bool{
 // Middleware is the cache middlware for negroni
 type Middleware struct {
 	Shared    bool
-	validator *Validator
+	// validator *Validator
 	cache     Cache
 }
 
@@ -55,6 +54,7 @@ type Middleware struct {
 func NewMiddleware(cache Cache) *Middleware {
 	return &Middleware{
 		cache:  cache,
+		// validator: &Validator{},
 		Shared: false,
 	}
 }
@@ -70,7 +70,7 @@ func (ch *Middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next ht
 	if !cReq.isCacheable() {
 		debugf("request not cacheable")
 		rw.Header().Set(CacheHeader, "SKIP")
-		ch.UpstreamWithCache(rw, cReq, next)
+		ch.UpstreamWithoutCache(rw, cReq, next)
 		return
 	}
 
@@ -96,8 +96,25 @@ func (ch *Middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next ht
 		ch.UpstreamWithCache(rw, cReq, next)
 		return
 	}
-
 	debugf("%s %s found in %s cache", r.Method, r.URL.String(), cacheType)
+
+	// if ch.isRequiredValidation(res, cReq) {
+	// 	if cReq.CacheControl.Has("only-if-cached") {
+	// 		http.Error(rw, "key was in cache, but required validation",
+	// 			http.StatusGatewayTimeout)
+	// 		return
+	// 	}
+	//
+	// 	debugf("validating cached response")
+	// 	if !ch.validator.Validate(r, res) {
+	// 		debugf("response is changed")
+	// 		ch.cache.Freshen(res, cReq.Key.String())
+	// 	} else {
+	// 		debugf("response is changed")
+	// 		ch.UpstreamWithCache(rw, cReq, next)
+	// 		return
+	// 	}
+	// }
 
 	res.Header().Set(CacheHeader, "HIT")
 	ch.ServeResource(res, rw, cReq)
@@ -146,7 +163,36 @@ func (ch *Middleware) ServeResource(res *Resource, rw http.ResponseWriter, req *
 	}
 }
 
-// UpstreamWithCache returns the request to a specific handler and stores the result
+// UpstreamWithoutCache forward the request to the next handler, the response is not stored or modified
+func (ch *Middleware) UpstreamWithoutCache(rw http.ResponseWriter, r *CacheRequest, next http.HandlerFunc) {
+	rs := NewResponseStreamer(rw)
+	rdr, err := rs.Stream.NextReader()
+	if err != nil {
+		debugf("error creating next stream reader: %v", err)
+		rw.Header().Set(CacheHeader, "SKIP")
+		next(rw, r.Request)
+		return
+	}
+	defer rdr.Close()
+
+	next(rs, r.Request)
+	rs.Stream.Close()
+
+	if r.Method != "HEAD" && !r.isStateChanging() {
+		return
+	}
+
+	res := rs.Resource()
+	defer res.Close()
+
+	if "HEAD" == r.Method {
+		ch.cache.Freshen(res, r.Key.ForMethod("GET").String())
+	} else if res.IsNonErrorStatus() {
+		debugf("invalidating resource %+v", res)
+	}
+}
+
+// UpstreamWithCache forward the request to the next handler, the response is stored in the cache
 func (ch *Middleware) UpstreamWithCache(rw http.ResponseWriter, r *CacheRequest, next http.HandlerFunc) {
 	rs := NewResponseStreamer(rw)
 	rdr, err := rs.Stream.NextReader()
@@ -164,14 +210,6 @@ func (ch *Middleware) UpstreamWithCache(rw http.ResponseWriter, r *CacheRequest,
 	rs.Stream.Close()
 
 	// Just the headers
-	res := NewResourceBytes(rs.StatusCode, nil, rs.Header())
-	if !ch.isCacheable(res, r) {
-		rdr.Close()
-		debugf("resource is uncacheable")
-		rs.Header().Set(CacheHeader, "SKIP")
-		return
-	}
-
 	b, err := ioutil.ReadAll(rdr)
 	rdr.Close()
 	if err != nil {
@@ -180,7 +218,14 @@ func (ch *Middleware) UpstreamWithCache(rw http.ResponseWriter, r *CacheRequest,
 		return
 	}
 	debugf("full upstream response took %s", Clock().Sub(t).String())
-	res.ReadSeekCloser = &ByteReadSeekCloser{bytes.NewReader(b)}
+
+	res := NewResourceBytes(rs.StatusCode, b, rs.Header())
+	if !ch.isCacheable(res, r) {
+		rdr.Close()
+		debugf("resource is uncacheable")
+		rs.Header().Set(CacheHeader, "SKIP")
+		return
+	}
 
 	// if age, err := CorrectedAge(res.Header(), t, Clock()); err == nil {
 	//     res.Header().Set("Age", strconv.Itoa(int(math.Ceil(age.Seconds()))))
@@ -252,6 +297,46 @@ func (ch *Middleware) LookupInCached(req *CacheRequest) (*Resource, error) {
 	// }
 
 	return res, nil
+}
+
+// isRequiredValidation returns true if HTTP request should be validated
+func (ch *Middleware) isRequiredValidation(res *Resource, r *CacheRequest) bool {
+	if res.MustValidate(ch.Shared) {
+		return true
+	}
+
+	freshness, err := ch.Freshness(res, r)
+	if err != nil {
+		debugf("error calculating freshness: %s", err.Error())
+		return true
+	}
+
+	if r.CacheControl.Has("min-fresh") {
+		reqMinFresh, err := r.CacheControl.Duration("min-fresh")
+		if err != nil {
+			debugf("error parsing request min-fresh: %s", err.Error())
+			return true
+		}
+
+		if freshness < reqMinFresh {
+			debugf("resource is fresh, but won't satisfy min-fresh of %s", reqMinFresh)
+			return true
+		}
+	}
+
+	debugf("resource has a freshness of %s", freshness)
+
+	if freshness <= 0 && r.CacheControl.Has("max-stale") {
+		if len(r.CacheControl["max-stale"]) == 0 {
+			debugf("resource is stale, but client sent max-stale")
+			return false
+		} else if maxStale, _ := r.CacheControl.Duration("max-stale"); maxStale >= (freshness * -1) {
+			debugf("resource is stale, but within allowed max-stale period of %s", maxStale)
+			return false
+		}
+	}
+
+	return freshness <= 0
 }
 
 // Freshness returns the duration that a requested resource will be fresh for
@@ -326,11 +411,11 @@ func (ch *Middleware) isCacheable(res *Resource, r *CacheRequest) bool {
 		return false
 	}
 
-	// if res.HasValidators() {
-	// 	return true
-	// } else if res.HeuristicFreshness() > 0 {
-	// 	return true
-	// }
+	if res.HasValidators() {
+		return true
+	} else if res.HeuristicFreshness() > 0 {
+		return true
+	}
 	return true
 }
 

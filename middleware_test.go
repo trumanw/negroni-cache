@@ -29,6 +29,7 @@ func TestMiddleware_ServeHTTP(t *testing.T) {
 	recNoCache, reqNoCache := setupServeHTTP(t)
 	mw.ServeHTTP(recNoCache, reqNoCache, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
+		w.Header().Set("ETag", "15f0fff99ed5aae4edffdd6496d7131f")
 	})
 	assert.Equal(t, recNoCache.Status(), 200)
 	assert.Equal(t, recNoCache.Header().Get(CacheHeader), "SKIP")
@@ -38,7 +39,8 @@ func TestMiddleware_ServeHTTP(t *testing.T) {
 
 	recCache, reqCache := setupServeHTTP(t)
 	mw.ServeHTTP(recCache, reqCache, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+		// the 201 won't be returned because the preview cache status code is 200
+		w.WriteHeader(201)
 	})
 
 	assert.Equal(t, recCache.Status(), 200)
